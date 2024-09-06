@@ -1,0 +1,50 @@
+version: '3.7'
+
+services:
+  master:
+    build:
+      context: ./master
+    environment:
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_DB=${DB_DATABASE}
+    volumes:
+      - master_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: on-failure 
+  slave:
+    build:
+      context: ./slave
+    environment:
+      - POSTGRES_PASSWORD=${DB_REPL_PASSWORD}
+      - POSTGRES_USER=${DB_REPL_USER}
+      - POSTGRES_DB=${DB_DATABASE}
+      - REPLICATION_ROLE=slave
+      - MASTER_HOST=${DB_HOST}
+      - MASTER_PORT=${DB_PORT}
+    depends_on:
+      master:
+        condition: service_healthy
+    volumes:
+      - slave_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    restart: on-failure 
+  mybot:
+    build:
+      context: ./bot
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}  
+    depends_on:
+      master:
+        condition: service_healthy
+
+volumes:
+  master_data:
+  slave_data:
